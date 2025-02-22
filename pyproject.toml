@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Square-GSPro-Automation"
+version = "0.1.0"
+description = "Script to automate the annoying steps of using Square connector with GSPro"
+dependencies = [
+    "pyautogui>=0.9.54",
+]
+
+[project.scripts]
+my-script = "main:main"
+
+[config]
+# Double any backslashes in quotes, e.g. "C:\\GSProV1"
+# gspro default folder is "C:\GSProV1"
+gspro_folder = ""
+sqg_connector_path = ""
