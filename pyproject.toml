@@ -1,20 +1,27 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=62.6", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "Square-GSPro-Automation"
 version = "0.1.0"
+requires-python = ">=3.11"
 description = "Script to automate the annoying steps of using Square connector with GSPro"
 dependencies = [
     "pyautogui>=0.9.54",
 ]
 
-[project.scripts]
-my-script = "main:main"
 
 [config]
-# Double any backslashes in quotes, e.g. "C:\\GSProV1"
-# gspro default folder is "C:\GSProV1"
+##########################################################
+## DOUBLE ANY BACKSLASHES IN QUOTES, e.g. "C:\\GSProV1" ##
+##########################################################
+
+# gspro default folder is "C:\\GSProV1"
 gspro_folder = ""
+# sqg connector default path is "C:\\Users\\%username%\\AppData\\Local\\Programs\\Invant Inc\\SQG-GSPRO-Connect\\SQG-GSPRO-Connect.exe"
 sqg_connector_path = ""
+# default window_timeout = 10
+window_timeout = 10
+# default ui_timeout = 15
+ui_timeout = 15

@@ -3,18 +3,20 @@ import os
 import subprocess
 import sys
 import tomllib
-from pprint import pprint
 from pathlib import Path
-import pathlib
 
 import pyautogui as p
 
 p.FAILSAFE = True
 
 
-# What values do we need set by the user?
-# gspro path
-# sqg connector path
+# Disables Quick Edit mode, which causes time.sleep() to lose focus and stall
+# whenever any window is clicked during execution
+import ctypes
+
+kernel32 = ctypes.windll.kernel32
+kernel32.SetConsoleMode(kernel32.GetStdHandle(-10), 128)
+# End Quick Edit mode fix
 
 # Get the directory containing the script
 script_path = Path(__file__).resolve()
@@ -40,9 +42,9 @@ dropdown_btn = Path(script_directory, "images/populated_dropdown.png")
 disconnect_verify = Path(script_directory, "images/disconnect.png")
 gsp_connected = Path(script_directory, "images/gsp_connected.png")
 
-# TODO: add custom IP configuration
-
 windows = p.getAllWindows()
+
+# TODO: add custom IP configuration automation
 
 
 def initVars():
@@ -59,10 +61,18 @@ def initVars():
 
   # Don't load if left empty
   if config.sqg_connector_path != "":
-    sqg_connector_path_check = Path(config.sqg_connector_path)
+    sqg_connector_path_check = Path(config.sqg_connector_path).resolve()
 
     if sqg_connector_path_check.exists() and sqg_connector_path_check.is_file():
       sqg_connector_path = sqg_connector_path_check
+
+  if config.window_timeout < 0:
+    global WINDOW_TIMEOUT
+    WINDOW_TIMEOUT = config.window_timeout
+
+  if config.ui_timeout < 0:
+    global UI_TIMEOUT
+    UI_TIMEOUT = config.ui_timeout
 
   # Sanity check defaults also exist
   if not gspro_file_path.exists() or not sqg_connector_path.exists():
@@ -104,7 +114,7 @@ def verifyWindow(win_name: str):
       print(f"{win_name} window could not be verified open.")
       return None
   else:
-    print(f"{win_name} window verified open. Continuing...")
+    print(f"{win_name} window verified open.")
     return window
 
 
@@ -117,6 +127,7 @@ def timer(seconds: int):
 
 def verifyUI(image: Path, grayscale: bool = False, region: tuple[int, int, int, int] = None, click: bool = False):
   """Verify UI element has changed to desired state, optionally clicking"""
+  print(f"verifying UI element {image.stem}")
   confidence = 0.9
   img_str = str(image)
   start_time, end_time = timer(UI_TIMEOUT)
@@ -126,15 +137,16 @@ def verifyUI(image: Path, grayscale: bool = False, region: tuple[int, int, int, 
     elem = p.locateOnScreen(image=img_str, grayscale=grayscale, confidence=confidence, region=region)
     if datetime.datetime.now() > end_time:
       print(f"{image.stem} UI could not be found. Exiting...")
+      p.sleep(10)
       close_apps()
       sys.exit(1)
 
-    p.screenshot(f"verification_screenshots/{image.stem}_verification_screenshot.png", region=elem)
+    # Use for debugging what pyautogui thinks it found. Is buggy. Make sure dir exists.
+    # p.screenshot(f"{script_directory}/verification_screenshots/{image.stem}_verification_screenshot.png", region=elem)
 
   if click:
     mid = p.center(elem)
     p.click(mid.x, mid.y, duration=1.0)
-    # p.click(img_str, duration=1.0)
 
 
 def verifyUIMulti(image: Path, grayscale: bool = False, region: tuple[int, int, int, int] = None, click: bool = False):
@@ -148,6 +160,7 @@ def verifyUIMulti(image: Path, grayscale: bool = False, region: tuple[int, int, 
     elems = p.locateAllOnScreen(image=img_str, grayscale=grayscale, confidence=confidence, region=region)
     if datetime.datetime.now() > end_time:
       print(f"{image.stem} UI could not be found. Exiting...")
+      p.sleep(5)
       close_apps()
       sys.exit(1)
 
@@ -161,9 +174,6 @@ def launchGSPro():
   """Launch and verify GSPro and API connector windows open."""
   print("Launching GSPro")
   gspro_pid = subprocess.Popen(gspro_file_path)
-
-  # Wait for it to load
-  p.sleep(10)
 
   # Check if GSPro is open
   gspro_win = verifyWindow(gspro)
@@ -197,63 +207,36 @@ def automate(sqg_connector_window):
   6. Verify connected to GSPro
   7. Switch active window to GSPro
   """
+  # Catch any case where the window is not passed along and find it
+  if sqg_connector_window is None:
+    sqg_connector_window = verifyWindow(connector_name)
+
   # Get the SQG connector window region to reduce search area for clicks, speeding up process
   rect = (sqg_connector_window.left, sqg_connector_window.top, sqg_connector_window.width, sqg_connector_window.height)
   sqg_connector_window.activate()
 
-  # print(f"connector_window: {connector_window}")
-  # print(f"connector_window._rect: {rect}")
-  # print("connector_window._rect attributes:")
-  # pprint(dir(connector_window._rect))
-
   # 1. Scan
   verifyUI(scan_btn, region=rect, click=True)
-  # scan = p.locateCenterOnScreen(scan_btn, confidence=0.8, region=rect)
-  # while scan is None:
-  #   scan = p.locateCenterOnScreen(scan_btn, confidence=0.8, region=rect)
-  # p.click(scan.x, scan.y, duration=1.0)
 
-  # 2. Wait for dropdown to populate
-  # once dropdown is located, LM is found
-  # enable grayscale because dropdown can be tinted
+  # 2. Wait for dropdown to populate. Once populated dropdown is located, LM is found
+  # Enable grayscale because dropdown can be tinted, reduces chance of not finding
   verifyUI(dropdown_btn, grayscale=True, region=rect)
-  # dropdown = p.locateOnScreen(dropdown_btn, grayscale=True, confidence=0.8, region=rect)
-  # while dropdown is None:
-  #   dropdown = p.locateOnScreen(dropdown_btn, grayscale=True, confidence=0.8, region=rect)
   print("Successfully verified LM was found")
 
   # 3. Click Connect (to LM)
   # 4. Click Connect (to GSPro)
   verifyUIMulti(connect_btn, region=rect, click=True)
-  # connect_buttons = p.locateAllOnScreen(connect_btn, confidence=0.8, region=rect)
-  # while connect_buttons is None:
-  #   connect_buttons = p.locateAllOnScreen(connect_btn, confidence=0.8, region=rect)
-
-  # i = 1
-  # for pos in connect_buttons:
-  #   print(f"Connect button {i}: {pos}")
-  #   button_point = p.center(pos)
-  #   p.click(button_point.x, button_point.y, duration=1.0)
-  #   print(f"Clicked {i} connect button")
-  #   i += 1
 
   # 5. Verify connected to LM
   verifyUI(disconnect_verify, region=rect)
-  # lm_connected = p.locateOnScreen(disconnect_verify, confidence=0.8, region=rect)
-  # while lm_connected is None:
-  #   lm_connected = p.locateOnScreen(disconnect_verify, confidence=0.8, region=rect)
   print("Successfully verified LM has connected")
 
   # 6. Verify connected to GSPro
   verifyUI(gsp_connected, region=rect)
-  # gsp_connect = p.locateOnScreen(gsp_connected, confidence=0.8, region=rect)
-  # while gsp_connect is None:
-  #   gsp_connect = p.locateOnScreen(gsp_connected, confidence=0.8, region=rect)
   print("Successfully verified connector has connected to GSPro")
 
   # 7. Switch active window to GSPro
   gspro_win = findWindow(gspro)
-
   if gspro_win:
     gspro_win.activate()
     print(f"Switched to {gspro}")
@@ -262,7 +245,11 @@ def automate(sqg_connector_window):
 
 
 def close_apps():
-  # attempt to find each window and close them
+  """Attempt to find each window and close them.
+  
+  Useful in situations where OpenAPI window doesn't close with GSPro,
+  such as when exiting GSPro via alt+F4 or clicking the upper right X.
+  """
   apps = [gspro, open_api_name, connector_name]
   windows = p.getAllWindows()
 
