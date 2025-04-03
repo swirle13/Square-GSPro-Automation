@@ -73,3 +73,11 @@ If you need to double check where GSPro or SQG-GSPRO-Connect is installed, you c
 6. If it took you to the same location you were in, you need to right click the shortcut and select "Properties" then "Shortcut" tab. Copy the path in "Start in" and paste it into the top bar in File Explorer
 7. You can now Shift + right click the .exe and select "Copy as path"
 8. You can now paste the value anywhere you need.
+
+# Roadmap
+
+Current items on my to-do list are the following, in no particular order:
+
+* Add script to automatically create a shortcut to desktop or start menu
+* Add automation for input to the text fields for custom IP addresses
+* Change configuration options to a better file than pyproject.toml
